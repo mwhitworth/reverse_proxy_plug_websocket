@@ -9,7 +9,16 @@ defmodule ReverseProxyPlugWebsocket.MixProject do
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      package: package()
+      package: package(),
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test
+      ],
+      aliases: aliases()
     ]
   end
 
@@ -26,7 +35,8 @@ defmodule ReverseProxyPlugWebsocket.MixProject do
       {:websockex, "~> 0.4.3", optional: true},
       {:websock_adapter, "~> 0.5"},
       {:websock, "~> 0.5"},
-      {:ex_doc, "~> 0.30.0", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.30.0", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 
@@ -34,6 +44,14 @@ defmodule ReverseProxyPlugWebsocket.MixProject do
     [
       licenses: ["Apache-2.0"],
       links: %{"GitHub" => "https://github.com/mwhitworth/reverse_proxy_plug_websocket"}
+    ]
+  end
+
+  defp aliases do
+    [
+      coverage: ["coveralls"],
+      "coverage.html": ["coveralls.html"],
+      "coverage.detail": ["coveralls.detail"]
     ]
   end
 end
