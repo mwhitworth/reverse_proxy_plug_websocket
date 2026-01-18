@@ -17,7 +17,9 @@ defmodule ReverseProxyPlugWebsocket.ProxyProcess do
           client_pid: pid(),
           upstream_conn: term(),
           adapter: module(),
-          opts: keyword()
+          opts: keyword(),
+          client_frame_processor: (term(), term() -> term() | :skip),
+          server_frame_processor: (term(), term() -> term() | :skip)
         }
 
   # Client API
@@ -50,6 +52,8 @@ defmodule ReverseProxyPlugWebsocket.ProxyProcess do
     upstream_uri = Keyword.fetch!(opts, :upstream_uri)
     client_pid = Keyword.fetch!(opts, :client_pid)
     headers = Keyword.get(opts, :headers, [])
+    client_frame_processor = Keyword.get(opts, :client_frame_processor, &default_processor/2)
+    server_frame_processor = Keyword.get(opts, :server_frame_processor, &default_processor/2)
 
     Logger.debug("Starting WebSocket proxy process for #{upstream_uri}")
 
@@ -66,7 +70,9 @@ defmodule ReverseProxyPlugWebsocket.ProxyProcess do
           client_pid: client_pid,
           upstream_conn: upstream_conn,
           adapter: adapter,
-          opts: opts
+          opts: opts,
+          client_frame_processor: client_frame_processor,
+          server_frame_processor: server_frame_processor
         }
 
         # Normalized messages will arrive via handle_info
@@ -80,30 +86,47 @@ defmodule ReverseProxyPlugWebsocket.ProxyProcess do
 
   @impl true
   def handle_cast({:client_frame, frame}, state) do
-    Logger.debug("Forwarding client frame to upstream: #{inspect(frame)}")
+    Logger.debug("Processing client frame: #{inspect(frame)}")
 
-    case state.adapter.send_frame(state.upstream_conn, frame) do
-      :ok ->
+    case state.client_frame_processor.(frame, state) do
+      :skip ->
+        Logger.debug("Client frame skipped")
         {:noreply, state}
 
-      {:error, reason} ->
-        Logger.error("Failed to forward frame to upstream: #{inspect(reason)}")
-        {:stop, {:upstream_send_failed, reason}, state}
+      processed_frame ->
+        Logger.debug("Forwarding client frame to upstream: #{inspect(processed_frame)}")
+
+        case state.adapter.send_frame(state.upstream_conn, processed_frame) do
+          :ok ->
+            {:noreply, state}
+
+          {:error, reason} ->
+            Logger.error("Failed to forward frame to upstream: #{inspect(reason)}")
+            {:stop, {:upstream_send_failed, reason}, state}
+        end
     end
   end
 
   @impl true
   def handle_info({:upstream_frame, frame}, state) do
-    Logger.debug("Received frame from upstream: #{inspect(frame)}")
+    Logger.debug("Processing upstream frame: #{inspect(frame)}")
 
-    # Forward to client
-    case forward_to_client(state.client_pid, frame) do
-      :ok ->
+    case state.server_frame_processor.(frame, state) do
+      :skip ->
+        Logger.debug("Server frame skipped")
         {:noreply, state}
 
-      {:error, reason} ->
-        Logger.error("Failed to forward frame to client: #{inspect(reason)}")
-        {:stop, {:client_send_failed, reason}, state}
+      processed_frame ->
+        Logger.debug("Forwarding server frame to client: #{inspect(processed_frame)}")
+
+        case forward_to_client(state.client_pid, processed_frame) do
+          :ok ->
+            {:noreply, state}
+
+          {:error, reason} ->
+            Logger.error("Failed to forward frame to client: #{inspect(reason)}")
+            {:stop, {:client_send_failed, reason}, state}
+        end
     end
   end
 
@@ -149,4 +172,6 @@ defmodule ReverseProxyPlugWebsocket.ProxyProcess do
     error ->
       {:error, error}
   end
+
+  defp default_processor(frame, _state), do: frame
 end

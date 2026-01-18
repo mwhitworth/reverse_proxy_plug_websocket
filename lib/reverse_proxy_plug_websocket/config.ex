@@ -11,7 +11,9 @@ defmodule ReverseProxyPlugWebsocket.Config do
           connect_timeout: pos_integer(),
           upgrade_timeout: pos_integer(),
           protocols: [String.t()],
-          tls_opts: keyword()
+          tls_opts: keyword(),
+          client_frame_processor: (term(), term() -> term() | :skip),
+          server_frame_processor: (term(), term() -> term() | :skip)
         }
 
   @doc """
@@ -30,6 +32,8 @@ defmodule ReverseProxyPlugWebsocket.Config do
     - :upgrade_timeout - WebSocket upgrade timeout in ms (default: 5000)
     - :protocols - WebSocket subprotocols (default: [])
     - :tls_opts - TLS options for wss:// connections (default: [])
+    - :client_frame_processor - Function to process/drop client frames (frame, state) -> frame | :skip
+    - :server_frame_processor - Function to process/drop server frames (frame, state) -> frame | :skip
   """
   @spec validate(keyword()) :: {:ok, config()} | {:error, String.t()}
   def validate(opts) do
@@ -39,7 +43,9 @@ defmodule ReverseProxyPlugWebsocket.Config do
          {:ok, headers} <- validate_headers(opts),
          {:ok, timeouts} <- validate_timeouts(opts),
          {:ok, protocols} <- validate_protocols(opts),
-         {:ok, tls_opts} <- validate_tls_opts(opts) do
+         {:ok, tls_opts} <- validate_tls_opts(opts),
+         {:ok, client_processor} <- validate_frame_processor(opts, :client_frame_processor),
+         {:ok, server_processor} <- validate_frame_processor(opts, :server_frame_processor) do
       config = %{
         upstream_uri: upstream_uri,
         path: path,
@@ -48,7 +54,9 @@ defmodule ReverseProxyPlugWebsocket.Config do
         connect_timeout: timeouts.connect,
         upgrade_timeout: timeouts.upgrade,
         protocols: protocols,
-        tls_opts: tls_opts
+        tls_opts: tls_opts,
+        client_frame_processor: client_processor,
+        server_frame_processor: server_processor
       }
 
       {:ok, config}
@@ -206,4 +214,20 @@ defmodule ReverseProxyPlugWebsocket.Config do
   end
 
   defp valid_headers?(_), do: false
+
+  defp validate_frame_processor(opts, key) do
+    case Keyword.fetch(opts, key) do
+      {:ok, processor} when is_function(processor, 2) ->
+        {:ok, processor}
+
+      {:ok, _} ->
+        {:error, "#{key} must be a function with arity 2"}
+
+      :error ->
+        # Use default pass-through processor
+        {:ok, &default_frame_processor/2}
+    end
+  end
+
+  defp default_frame_processor(frame, _state), do: frame
 end

@@ -104,5 +104,55 @@ defmodule ReverseProxyPlugWebsocket.ConfigTest do
       opts = [upstream_uri: "ws://localhost:4000", path: "/socket", tls_opts: "invalid"]
       assert {:error, "tls_opts must be a keyword list"} = Config.validate(opts)
     end
+
+    test "accepts valid frame processors" do
+      processor = fn frame, _state -> frame end
+
+      opts = [
+        upstream_uri: "ws://localhost:4000",
+        path: "/socket",
+        client_frame_processor: processor,
+        server_frame_processor: processor
+      ]
+
+      assert {:ok, config} = Config.validate(opts)
+      assert is_function(config.client_frame_processor, 2)
+      assert is_function(config.server_frame_processor, 2)
+    end
+
+    test "uses default frame processors when not provided" do
+      opts = [upstream_uri: "ws://localhost:4000", path: "/socket"]
+
+      assert {:ok, config} = Config.validate(opts)
+      assert is_function(config.client_frame_processor, 2)
+      assert is_function(config.server_frame_processor, 2)
+
+      # Default processor should pass through frames
+      frame = {:text, "test"}
+      assert config.client_frame_processor.(frame, %{}) == frame
+      assert config.server_frame_processor.(frame, %{}) == frame
+    end
+
+    test "rejects invalid client_frame_processor" do
+      opts = [
+        upstream_uri: "ws://localhost:4000",
+        path: "/socket",
+        client_frame_processor: "not a function"
+      ]
+
+      assert {:error, "client_frame_processor must be a function with arity 2"} =
+               Config.validate(opts)
+    end
+
+    test "rejects invalid server_frame_processor" do
+      opts = [
+        upstream_uri: "ws://localhost:4000",
+        path: "/socket",
+        server_frame_processor: fn x -> x end
+      ]
+
+      assert {:error, "server_frame_processor must be a function with arity 2"} =
+               Config.validate(opts)
+    end
   end
 end
