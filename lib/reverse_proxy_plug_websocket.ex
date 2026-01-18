@@ -23,6 +23,8 @@ defmodule ReverseProxyPlugWebsocket do
     * `:upgrade_timeout` - WebSocket upgrade timeout in ms (default: 5000)
     * `:protocols` - WebSocket subprotocols to negotiate (default: [])
     * `:tls_opts` - TLS options for wss:// connections (default: [])
+    * `:client_frame_processor` - Function to process/drop client frames (frame, state) -> frame | :skip
+    * `:server_frame_processor` - Function to process/drop server frames (frame, state) -> frame | :skip
 
   ## Examples
 
@@ -52,6 +54,20 @@ defmodule ReverseProxyPlugWebsocket do
           verify: :verify_peer,
           cacertfile: "/path/to/ca.pem"
         ]
+
+      # With frame processors to filter/transform frames
+      plug ReverseProxyPlugWebsocket,
+        upstream_uri: "ws://localhost:4000/socket",
+        path: "/socket",
+        client_frame_processor: fn
+          {:text, "drop me"}, _state -> :skip
+          {:text, text}, _state -> {:text, String.upcase(text)}
+          frame, _state -> frame
+        end,
+        server_frame_processor: fn
+          {:text, text}, _state -> {:text, String.downcase(text)}
+          frame, _state -> frame
+        end
   """
 
   @behaviour Plug
@@ -120,7 +136,9 @@ defmodule ReverseProxyPlugWebsocket do
       connect_timeout: config.connect_timeout,
       upgrade_timeout: config.upgrade_timeout,
       protocols: config.protocols,
-      tls_opts: config.tls_opts
+      tls_opts: config.tls_opts,
+      client_frame_processor: config.client_frame_processor,
+      server_frame_processor: config.server_frame_processor
     ]
 
     # Upgrade the connection using WebSockAdapter
