@@ -68,6 +68,18 @@ defmodule ReverseProxyPlugWebsocket.ConfigTest do
       assert {:error, "path must be a string"} = Config.validate(opts)
     end
 
+    test "rejects URI without scheme" do
+      opts = [upstream_uri: "//localhost:4000", path: "/socket"]
+      assert {:error, "upstream_uri must use ws:// or wss:// scheme"} = Config.validate(opts)
+    end
+
+    test "rejects URI with invalid scheme (common mistake)" do
+      opts = [upstream_uri: "localhost:4000", path: "/socket"]
+
+      assert {:error, "upstream_uri must use ws:// or wss:// scheme, got: localhost://"} =
+               Config.validate(opts)
+    end
+
     test "rejects invalid URI scheme" do
       opts = [upstream_uri: "http://example.com", path: "/socket"]
 
