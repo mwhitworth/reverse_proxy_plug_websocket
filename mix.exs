@@ -30,6 +30,7 @@ defmodule ReverseProxyPlugWebsocket.MixProject do
 
   defp deps do
     [
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:plug, "~> 1.14"},
       {:gun, "~> 2.0", optional: true},
       {:websockex, "~> 0.4.3", optional: true},

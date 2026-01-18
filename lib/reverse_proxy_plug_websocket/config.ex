@@ -69,20 +69,17 @@ defmodule ReverseProxyPlugWebsocket.Config do
     case Keyword.fetch(opts, :upstream_uri) do
       {:ok, uri} when is_binary(uri) ->
         case URI.parse(uri) do
+          %URI{scheme: nil} ->
+            {:error, "upstream_uri must use ws:// or wss:// scheme"}
+
           %URI{scheme: scheme} when scheme not in ["ws", "wss"] ->
             {:error, "upstream_uri must use ws:// or wss:// scheme, got: #{scheme}://"}
 
-          %URI{host: nil} ->
+          %URI{host: host} when host in [nil, ""] ->
             {:error, "upstream_uri must include a host"}
 
-          %URI{host: ""} ->
-            {:error, "upstream_uri must include a host"}
-
-          %URI{scheme: scheme, host: host} when scheme in ["ws", "wss"] and not is_nil(host) ->
+          %URI{} ->
             {:ok, uri}
-
-          _ ->
-            {:error, "invalid upstream_uri format"}
         end
 
       {:ok, _} ->
