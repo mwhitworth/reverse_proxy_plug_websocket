@@ -12,9 +12,9 @@ defmodule ReverseProxyPlugWebsocket.WebSocketClient do
   (e.g., {:gun_ws, ...} for Gun) and converts them to normalized messages sent
   to the ProxyProcess:
 
-    - {:upstream_frame, frame} - A frame was received from upstream
-    - {:upstream_closed, reason} - The upstream connection was closed
-    - {:upstream_error, reason} - An error occurred on the upstream connection
+    - `{:upstream_frame, frame}` - A frame was received from upstream
+    - `{:upstream_closed, reason}` - The upstream connection was closed
+    - `{:upstream_error, reason}` - An error occurred on the upstream connection
 
   This ensures ProxyProcess remains completely adapter-agnostic.
   """
@@ -44,15 +44,15 @@ defmodule ReverseProxyPlugWebsocket.WebSocketClient do
       - :receiver_target (required) - PID to send normalized messages to
 
   ## Returns
-    - {:ok, connection} on success
-    - {:error, reason} on failure
+    - `{:ok, connection}` on success
+    - `{:error, reason}` on failure
 
   ## Normalized Messages
 
   The receiver process must send these messages to the receiver_target:
-    - {:upstream_frame, frame} - When a frame is received
-    - {:upstream_closed, reason} - When the connection closes
-    - {:upstream_error, reason} - When an error occurs
+    - `{:upstream_frame, frame}` - When a frame is received
+    - `{:upstream_closed, reason}` - When the connection closes
+    - `{:upstream_error, reason}` - When an error occurs
   """
   @callback connect(uri, headers, opts) :: {:ok, connection} | {:error, term()}
 
@@ -65,7 +65,7 @@ defmodule ReverseProxyPlugWebsocket.WebSocketClient do
 
   ## Returns
     - :ok on success
-    - {:error, reason} on failure
+    - `{:error, reason}` on failure
   """
   @callback send_frame(connection, frame) :: :ok | {:error, term()}
 
