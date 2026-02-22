@@ -5,7 +5,7 @@ defmodule ReverseProxyPlugWebsocket.MixProject do
     [
       app: :reverse_proxy_plug_websocket,
       description: "Support reverse proxying of websocket connections natively in Elixir",
-      version: "0.1.0",
+      version: "0.2.0",
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
