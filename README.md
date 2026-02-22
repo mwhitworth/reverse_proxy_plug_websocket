@@ -131,6 +131,71 @@ plug ReverseProxyPlugWebsocket,
   upgrade_timeout: 15_000   # 15 seconds for WebSocket upgrade
 ```
 
+## Frame Processing
+
+Frame processors let you intercept, modify, or drop WebSocket frames as they flow
+through the proxy — in either direction.
+
+- **`:client_frame_processor`** — runs on frames traveling client → server (upstream)
+- **`:server_frame_processor`** — runs on frames traveling server → client
+
+Both take a function `(frame, state) -> frame | :skip`:
+- Return the frame (optionally modified) to forward it
+- Return `:skip` to drop it entirely
+
+### Frame Types
+
+| Frame | Direction | Description |
+|-------|-----------|-------------|
+| `{:text, binary}` | both | Text WebSocket frame |
+| `{:binary, binary}` | both | Binary WebSocket frame |
+| `{:ping, binary}` | both | Ping control frame |
+| `{:pong, binary}` | both | Pong control frame |
+| `:close` | client → server | Close frame (no code) |
+| `{:close, code, reason}` | server → client | Close frame with status code |
+
+### Examples
+
+**Log all frames in both directions:**
+
+```elixir
+plug ReverseProxyPlugWebsocket,
+  upstream_uri: "ws://localhost:4000/socket",
+  path: "/socket",
+  client_frame_processor: fn frame, _state ->
+    Logger.debug("client → server: #{inspect(frame)}")
+    frame
+  end,
+  server_frame_processor: fn frame, _state ->
+    Logger.debug("server → client: #{inspect(frame)}")
+    frame
+  end
+```
+
+**Transform text frames going to upstream:**
+
+```elixir
+plug ReverseProxyPlugWebsocket,
+  upstream_uri: "ws://localhost:4000/socket",
+  path: "/socket",
+  client_frame_processor: fn
+    {:text, text}, _state -> {:text, String.upcase(text)}
+    frame, _state -> frame
+  end
+```
+
+**Drop frames matching a pattern coming from upstream:**
+
+```elixir
+plug ReverseProxyPlugWebsocket,
+  upstream_uri: "ws://localhost:4000/socket",
+  path: "/socket",
+  server_frame_processor: fn
+    {:text, "internal:" <> _}, _state -> :skip
+    frame, _state -> frame
+  end
+```
+
 ### Choosing an Adapter
 
 The library supports two WebSocket client adapters:
@@ -185,6 +250,8 @@ plug ReverseProxyPlugWebsocket,
 | `:upgrade_timeout` | Integer | No | `5000` | WebSocket upgrade timeout in ms |
 | `:protocols` | List | No | `[]` | WebSocket subprotocols to negotiate |
 | `:tls_opts` | Keyword | No | `[]` | TLS options for wss:// connections |
+| `:client_frame_processor` | Function | No | passthrough | `(frame, state) -> frame \| :skip` — intercept client → server frames |
+| `:server_frame_processor` | Function | No | passthrough | `(frame, state) -> frame \| :skip` — intercept server → client frames |
 
 ## Architecture
 
